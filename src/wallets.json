@@ -1,0 +1,58 @@
+{
+    "wallets": [
+        {
+            "numero": 5,
+            "lowerbound": "10",
+            "upperbound": "1f",
+            "address": "1E6NuFjCi27W5zoXg8TRdcSRq84zJeBW3k"
+        },
+        {
+            "numero": 6,
+            "lowerbound": "20",
+            "upperbound": "3f",
+            "address": "1PitScNLyp2HCygzadCh7FveTnfmpPbfp8"
+        },
+        {
+            "numero": 8,
+            "lowerbound": "80",
+            "upperbound": "ff",
+            "address": "1M92tSqNmQLYw33fuBvjmeadirh1ysMBxK"
+        },
+        {
+            "numero": 15,
+            "lowerbound": "4000",
+            "upperbound": "7fff",
+            "address": "1QCbW9HWnwQWiQqVo5exhAnmfqKRrCRsvW"
+        },
+        {
+            "numero": 20,
+            "lowerbound": "80000",
+            "upperbound": "fffff",
+            "address": "1HsMJxNiV7TLxmoF6uJNkydxPFDog4NQum"
+        },
+        {
+            "numero": 28,
+            "lowerbound": "8000000",
+            "upperbound": "fffffff",
+            "address": "12jbtzBb54r97TCwW3G1gCFoumpckRAPdY"
+        },
+        {
+            "numero": 30,
+            "lowerbound": "20000000",
+            "upperbound": "3fffffff",
+            "address": "1LHtnpd8nU5VHEMkG2TMYYNUjjLc992bps"
+        },
+        {
+            "numero": 40,
+            "lowerbound": "8000000000",
+            "upperbound": "ffffffffff",
+            "address": "1EeAxcprB2PpCnr34VfZdFrkUWuxyiNEFv"
+        },
+        {
+            "numero": 66,
+            "lowerbound": "20000000000000000",
+            "upperbound": "3ffffffffffffffff",
+            "address": "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so"
+        }
+    ]
+}
