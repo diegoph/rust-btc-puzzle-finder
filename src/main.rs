@@ -45,7 +45,7 @@ struct Wallets {
 }
 
 fn load_wallets() -> Wallets {
-    let mut file = File::open("src/wallets.json").expect("File not found");
+    let mut file = File::open("./src/wallets.json").expect("File not found");
     let mut data = String::new();
     file.read_to_string(&mut data).expect("Unable to read string");
     serde_json::from_str(&data).expect("JSON was not well-formatted")
