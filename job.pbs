@@ -2,7 +2,7 @@
 #PBS -N meu_job
 #PBS -l nodes=2:ppn=2  # Especifica o uso de 1 nó do tipo 'hbm' com 2 CPUs por nó
 #PBS -l cput=100:00:00
-#PBS -l walltime=24:00:00
+#PBS -l walltime=100:00:00
 #PBS -q batch
 #PBS -o /home/u225581/rust-btc-puzzle-finder/meu_job_output_end_${PBS_JOBID}.txt
 #PBS -e /home/u225581/rust-btc-puzzle-finder/meu_job_error_end_${PBS_JOBID}.txt
