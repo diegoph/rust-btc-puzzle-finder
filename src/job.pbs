@@ -1,0 +1,22 @@
+#!/bin/bash
+#PBS -N meu_job
+#PBS -l nodes=2:ppn=2  # Especifica o uso de 1 nó do tipo 'hbm' com 2 CPUs por nó
+#PBS -l cput=100:00:00
+#PBS -l walltime=24:00:00
+#PBS -q batch
+#PBS -o /home/u225581/rust-btc-puzzle-finder/meu_job_output_end_${PBS_JOBID}.txt
+#PBS -e /home/u225581/rust-btc-puzzle-finder/meu_job_error_end_${PBS_JOBID}.txt
+#PBS -d /home/u225581/rust-btc-puzzle-finder/  # Define o diretório de trabalho
+
+# Carregar módulos necessários
+module avail
+module load gcc  # Use um módulo alternativo se 'intel' não estiver disponível
+
+# Definir variável de ambiente
+export WALLETS_PATH=/home/u225581/rust-btc-puzzle-finder/src/wallets.json
+
+# Verificar permissões do executável
+chmod +x /home/u225581/rust-btc-puzzle-finder/target/release/btc_key_checker
+
+# Executar o job com o argumento da carteira
+/home/u225581/rust-btc-puzzle-finder/target/release/btc_key_checker --carteira=66 > /home/u225581/rust-btc-puzzle-finder/meu_job_output_${PBS_JOBID}.txt 2> /home/u225581/rust-btc-puzzle-finder/meu_job_error_${PBS_JOBID}.txt

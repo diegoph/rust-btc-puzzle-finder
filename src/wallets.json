@@ -49,10 +49,22 @@
             "address": "1EeAxcprB2PpCnr34VfZdFrkUWuxyiNEFv"
         },
         {
+            "numero": 65,
+            "lowerbound": "10000000000000000",
+            "upperbound": "1ffffffffffffffff",
+            "address": "18ZMbwUFLMHoZBbfpCjUJQTCMCbktshgpe"
+        },
+        {
             "numero": 66,
             "lowerbound": "20000000000000000",
             "upperbound": "3ffffffffffffffff",
             "address": "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so"
+        },
+        {
+            "numero": 130,
+            "lowerbound": "200000000000000000000000000000000",
+            "upperbound": "3ffffffffffffffffffffffffffffffff",
+            "address": "1Fo65aKq8s8iquMt6weF1rku1moWVEd5Ua"
         }
     ]
 }
