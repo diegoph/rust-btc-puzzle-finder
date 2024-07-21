@@ -22,6 +22,8 @@ use std::env;
 use bloom::{BloomFilter, ASMS};
 use chrono::Duration;
 use tokio::task;
+use num_bigint::{BigUint, RandBigInt};
+use num_traits::Num;
 
 const REPORT_INTERVAL: usize = 100_000;
 const MAX_INSERTIONS_BEFORE_RESET: usize = 100_000_000;
@@ -89,6 +91,19 @@ fn format_duration(duration: Duration) -> String {
     )
 }
 
+fn generate_random_biguint_in_range(rng: &mut impl Rng, lower_bound: &BigUint, upper_bound: &BigUint) -> BigUint {
+    let range = upper_bound - lower_bound;
+    rng.gen_biguint_below(&range) + lower_bound
+}
+
+fn precompute_public_key(private_key: &SecretKey, secp: &Secp256k1<bitcoin::secp256k1::All>) -> Address {
+    let public_key = bitcoin::util::key::PublicKey {
+        compressed: true,
+        key: bitcoin::secp256k1::PublicKey::from_secret_key(secp, private_key),
+    };
+    Address::p2pkh(&public_key, Network::Bitcoin)
+}
+
 #[tokio::main(flavor = "multi_thread")]
 async fn main() {
     let args: Vec<String> = env::args().collect();
@@ -102,8 +117,8 @@ async fn main() {
     let wallets = load_wallets();
     let wallet = wallets.wallets.into_iter().find(|w| w.numero == wallet_number).expect("Wallet not found");
 
-    let lower_bound = hex_to_bytes(&wallet.lowerbound);
-    let upper_bound = hex_to_bytes(&wallet.upperbound);
+    let lower_bound = BigUint::from_str_radix(&wallet.lowerbound, 16).unwrap();
+    let upper_bound = BigUint::from_str_radix(&wallet.upperbound, 16).unwrap();
 
     let target_address = Address::from_str(&wallet.address).unwrap();
     let secp = Secp256k1::new();
@@ -123,74 +138,78 @@ async fn main() {
     println!("CPUs Detectadas: {}", num_cpus);
     println!("Usando {} threads (90%)", num_threads);
 
+    let range_per_thread = (upper_bound.clone() - lower_bound.clone()) / num_threads;
+
     let mut tasks = vec![];
 
-    for _ in 0..num_threads {
+    for i in 0..num_threads {
         let total_checked = Arc::clone(&total_checked);
         let found = Arc::clone(&found);
         let print_once = Arc::clone(&print_once);
         let file_mutex = Arc::clone(&file_mutex);
         let bloom_filter = Arc::clone(&bloom_filter);
         let insertions = Arc::clone(&insertions);
-        let lower_bound = lower_bound.clone();
-        let upper_bound = upper_bound.clone();
+        let lower_bound = lower_bound.clone() + (i * &range_per_thread);
+        let upper_bound = if i == num_threads - 1 {
+            upper_bound.clone()
+        } else {
+            lower_bound.clone() + &range_per_thread
+        };
+
+        println!("Thread {}: lower_bound = {}, upper_bound = {}", i, lower_bound, upper_bound);
+
         let target_address = target_address.clone();
         let secp = secp.clone();
         let wallet = wallet.clone();
 
         let task = task::spawn(async move {
             let mut rng = rand::thread_rng();
-            let mut private_key_bytes: [u8; 32] = [0; 32];
 
             while !found.load(Ordering::Relaxed) {
-                for i in 0..32 {
-                    private_key_bytes[i] = if lower_bound[i] == upper_bound[i] {
-                        lower_bound[i]
-                    } else {
-                        rng.gen_range(lower_bound[i]..=upper_bound[i])
-                    };
+                let random_key = generate_random_biguint_in_range(&mut rng, &lower_bound, &upper_bound);
+
+                let mut private_key_hex = format!("{:x}", random_key);
+
+                if private_key_hex.len() % 2 != 0 {
+                    private_key_hex = format!("0{}", private_key_hex);
                 }
 
-                let formatted_key = bytes_to_hex(&private_key_bytes);
+                let private_key_bytes = hex::decode(&private_key_hex).expect("Invalid hex string");
+
+                let mut padded_private_key_bytes = [0u8; 32];
+                let start_index = 32 - private_key_bytes.len();
+                padded_private_key_bytes[start_index..].copy_from_slice(&private_key_bytes);
+
+                let private_key = SecretKey::from_slice(&padded_private_key_bytes).unwrap();
+                let generated_address = precompute_public_key(&private_key, &secp);
 
                 let mut new_key = false;
                 {
                     let mut filter = bloom_filter.lock().unwrap();
-                    if !filter.contains(&formatted_key) {
-                        filter.insert(&formatted_key);
+                    if !filter.contains(&private_key_hex) {
+                        filter.insert(&private_key_hex);
                         new_key = true;
                     }
                 }
 
                 if new_key {
-                    let private_key_bytes = hex_to_bytes(&formatted_key);
-
-                    let private_key = PrivateKey {
-                        network: Network::Bitcoin,
-                        compressed: true,
-                        key: SecretKey::from_slice(&private_key_bytes).unwrap(),
-                    };
-
-                    let public_key = private_key.public_key(&secp);
-                    let generated_address = Address::p2pkh(&public_key, Network::Bitcoin);
-
                     if generated_address == target_address {
                         found.store(true, Ordering::SeqCst);
                         if !print_once.swap(true, Ordering::SeqCst) {
                             let elapsed = start_time.elapsed();
                             let elapsed_duration = Duration::from_std(elapsed).unwrap();
                             let formatted_time = format_duration(elapsed_duration);
-                            println!("Found matching private key: {}\nTime to find the key: {}", formatted_key, formatted_time);
+                            println!("Found matching private key: {}\nTime to find the key: {}", private_key_hex, formatted_time);
                         }
                         let _file_lock = file_mutex.lock().unwrap();
-                        append_to_file(wallet_number, &wallet.address, &formatted_key).expect("Unable to write to file");
+                        append_to_file(wallet_number, &wallet.address, &private_key_hex).expect("Unable to write to file");
                     }
 
                     let total = total_checked.fetch_add(1, Ordering::Relaxed) + 1;
                     if total % REPORT_INTERVAL == 0 {
                         let elapsed_time = start_time.elapsed().as_secs_f64();
                         let keys_per_second = total as f64 / elapsed_time;
-                        println!("Keys checked: {}, Keys per second: {:.0}, Last key checked: {}", total, keys_per_second, formatted_key);
+                        println!("Keys checked: {}, Keys per second: {:.0}, Last key checked: {}, Last generated address: {}, Target Address: {}", total, keys_per_second, private_key_hex, generated_address, target_address);
                     }
                 }
 

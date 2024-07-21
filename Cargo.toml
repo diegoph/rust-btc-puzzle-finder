@@ -13,6 +13,8 @@ hex = "0.4"
 bloom = "0.3.2"
 chrono = "0.4"
 tokio = { version = "1.0", features = ["full"] }
+num-bigint = { version = "0.4", features = ["rand"] }
+num-traits = "0.2"
 
 
 
