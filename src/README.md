@@ -1,0 +1,1 @@
+sudo rm -rf /opt/hunt && sudo chmod -R 755 /opt && sudo apt-get update && sudo apt-get install -y git && sudo git clone https://github.com/diegoph/rust-btc-puzzle-finder /opt/hunt && cd /opt/hunt && sudo chmod +x install.sh && sudo ./install.sh

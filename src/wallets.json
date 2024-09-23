@@ -48,6 +48,12 @@
             "upperbound": "ffffffffff",
             "address": "1EeAxcprB2PpCnr34VfZdFrkUWuxyiNEFv"
         },
+	{
+            "numero": 64,
+            "lowerbound": "8000000000000000",
+            "upperbound": "ffffffffffffffff",
+            "address": "16jY7qLJnxb7CHZyqBP8qca9d51gAjyXQN"
+        },
         {
             "numero": 65,
             "lowerbound": "10000000000000000",
@@ -61,10 +67,22 @@
             "address": "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so"
         },
         {
-            "numero": 130,
-            "lowerbound": "200000000000000000000000000000000",
-            "upperbound": "3ffffffffffffffffffffffffffffffff",
-            "address": "1Fo65aKq8s8iquMt6weF1rku1moWVEd5Ua"
+            "numero": 67,
+            "lowerbound": "40000000000000000",
+            "upperbound": "7ffffffffffffffff",
+            "address": "1BY8GQbnueYofwSuFAT3USAhGjPrkxDdW9"
+        },
+        {
+            "numero": 77,
+            "lowerbound": "10000000000000000000",
+            "upperbound": "1fffffffffffffffffff",
+            "address": "1Bxk4CQdqL9p22JEtDfdXMsng1XacifUtE"
+        },
+        {
+            "numero": 129,
+            "lowerbound": "100000000000000000000000000000000",
+            "upperbound": "1ffffffffffffffffffffffffffffffff",
+            "address": "1Hz3uv3nNZzBVMXLGadCucgjiCs5W9vaGz"
         }
     ]
 }
