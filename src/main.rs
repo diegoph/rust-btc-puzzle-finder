@@ -133,7 +133,7 @@ async fn main() {
     let insertions = Arc::new(AtomicUsize::new(0));
 
     let num_cpus = num_cpus::get();
-    let num_threads = (num_cpus as f64 * 0.9).ceil() as usize;
+    let num_threads = if num_cpus > 1 { num_cpus - 1 } else { 1 };
 
     println!("CPUs Detectadas: {}", num_cpus);
     println!("Usando {} threads (90%)", num_threads);

@@ -3,6 +3,8 @@
 #make
 #NUM_THREADS=$(($(nproc) - 1))
 
+source "$HOME/.cargo/env"
+
 cargo build --release
 
 SERVICE_FILE=/etc/systemd/system/keyhunt.service
