@@ -138,7 +138,7 @@ async fn main() {
     let num_cpus = num_cpus::get();
     let num_threads = if num_cpus > 1 { num_cpus - 1 } else { 1 };
 
-    let range_size: BigUint = BigUint::from_str_radix("1000000", 16).unwrap();
+    let range_size: BigUint = BigUint::from_str_radix("500000", 16).unwrap();
     let total_range = &upper_bound - &lower_bound;
 
     println!("CPUs Detectadas: {}", num_cpus);
