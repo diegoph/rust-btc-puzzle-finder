@@ -6,11 +6,10 @@ extern crate hex;
 extern crate bloom;
 extern crate chrono;
 
-use bitcoin::network::constants::Network;
 use bitcoin::util::address::Address;
-use bitcoin::util::key::PrivateKey;
 use bitcoin::secp256k1::{Secp256k1, SecretKey};
-use rand::Rng;
+use bitcoin::hashes::{sha256, ripemd160, Hash}; // Importando o trait Hash
+use rand::{Rng, SeedableRng, rngs::StdRng};
 use serde::{Deserialize, Serialize};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Read, Write};
@@ -19,7 +18,8 @@ use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::time::Instant;
 use std::env;
-use bloom::{BloomFilter, ASMS};
+use bloom::{BloomFilter, ASMS};  // Importando o ASMS para acessar contains e insert
+
 use chrono::Duration;
 use tokio::task;
 use num_bigint::{BigUint, RandBigInt};
@@ -27,8 +27,8 @@ use num_traits::Num;
 
 const REPORT_INTERVAL: usize = 100_000;
 const MAX_INSERTIONS_BEFORE_RESET: usize = 100_000_000;
-const BLOOM_FILTER_SIZE: usize = 958_505_839;
-const BLOOM_FILTER_HASHES: u32 = 7;
+const BLOOM_FILTER_SIZE: usize = 1_438_935_000;  // Aproximadamente 172 MB
+const BLOOM_FILTER_HASHES: u32 = 10;             // 10 funções de hash
 
 #[derive(Serialize, Deserialize, Clone)]
 struct Wallet {
@@ -75,10 +75,6 @@ fn hex_to_bytes(hex: &str) -> [u8; 32] {
     bytes
 }
 
-fn bytes_to_hex(bytes: &[u8; 32]) -> String {
-    bytes.iter().map(|byte| format!("{:02x}", byte)).collect()
-}
-
 fn format_duration(duration: Duration) -> String {
     let days = duration.num_days();
     let hours = duration.num_hours() % 24;
@@ -96,12 +92,16 @@ fn generate_random_biguint_in_range(rng: &mut impl Rng, lower_bound: &BigUint, u
     rng.gen_biguint_below(&range) + lower_bound
 }
 
-fn precompute_public_key(private_key: &SecretKey, secp: &Secp256k1<bitcoin::secp256k1::All>) -> Address {
-    let public_key = bitcoin::util::key::PublicKey {
-        compressed: true,
-        key: bitcoin::secp256k1::PublicKey::from_secret_key(secp, private_key),
-    };
-    Address::p2pkh(&public_key, Network::Bitcoin)
+// Função para calcular o RIPEMD-160 a partir de uma chave privada
+fn compute_ripemd160_from_private_key(private_key: &SecretKey, secp: &Secp256k1<bitcoin::secp256k1::All>) -> ripemd160::Hash {
+    // Gerar chave pública a partir da chave privada
+    let public_key = bitcoin::secp256k1::PublicKey::from_secret_key(secp, private_key);
+    
+    // Fazer o hash SHA-256 da chave pública
+    let sha256_hash = sha256::Hash::hash(&public_key.serialize()); // Usando serialize() no lugar de to_bytes()
+    
+    // Fazer o hash RIPEMD-160 do resultado do SHA-256
+    ripemd160::Hash::hash(&sha256_hash)
 }
 
 #[tokio::main(flavor = "multi_thread")]
@@ -120,6 +120,9 @@ async fn main() {
     let lower_bound = BigUint::from_str_radix(&wallet.lowerbound, 16).unwrap();
     let upper_bound = BigUint::from_str_radix(&wallet.upperbound, 16).unwrap();
 
+    // Definir o tamanho padrão do range
+   
+
     let target_address = Address::from_str(&wallet.address).unwrap();
     let secp = Secp256k1::new();
 
@@ -127,7 +130,7 @@ async fn main() {
     let found = Arc::new(AtomicBool::new(false));
     let start_time = Instant::now();
     let print_once = Arc::new(AtomicBool::new(false));
-    
+
     let file_mutex = Arc::new(Mutex::new(()));
     let bloom_filter = Arc::new(Mutex::new(BloomFilter::with_size(BLOOM_FILTER_SIZE, BLOOM_FILTER_HASHES)));
     let insertions = Arc::new(AtomicUsize::new(0));
@@ -135,10 +138,19 @@ async fn main() {
     let num_cpus = num_cpus::get();
     let num_threads = if num_cpus > 1 { num_cpus - 1 } else { 1 };
 
+    let range_size: BigUint = BigUint::from_str_radix("100000", 16).unwrap();
+    let total_range = &upper_bound - &lower_bound;
+
     println!("CPUs Detectadas: {}", num_cpus);
     println!("Usando {} threads (90%)", num_threads);
 
-    let range_per_thread = (upper_bound.clone() - lower_bound.clone()) / num_threads;
+    let target_ripemd160 = match target_address.payload {
+        bitcoin::util::address::Payload::PubkeyHash(ref hash) => *hash,
+        _ => panic!("Endereço alvo inválido."),
+    };
+
+    // Substituir `ThreadRng` por `StdRng` que é `Send`
+    let rng_mutex = Arc::new(Mutex::new(StdRng::from_entropy()));
 
     let mut tasks = vec![];
 
@@ -149,57 +161,70 @@ async fn main() {
         let file_mutex = Arc::clone(&file_mutex);
         let bloom_filter = Arc::clone(&bloom_filter);
         let insertions = Arc::clone(&insertions);
-        let lower_bound = lower_bound.clone() + (i * &range_per_thread);
-        let upper_bound = if i == num_threads - 1 {
-            upper_bound.clone()
-        } else {
-            lower_bound.clone() + &range_per_thread
-        };
-
-        println!("Thread {}: lower_bound = {}, upper_bound = {}", i, lower_bound, upper_bound);
-
-        let target_address = target_address.clone();
+        let rng_mutex = Arc::clone(&rng_mutex);
         let secp = secp.clone();
         let wallet = wallet.clone();
+        let target_ripemd160 = target_ripemd160.clone();
+        let lower_bound = lower_bound.clone();
+        let upper_bound = upper_bound.clone();
+        let range_size = range_size.clone();
 
         let task = task::spawn(async move {
-            let mut rng = rand::thread_rng();
-
             while !found.load(Ordering::Relaxed) {
-                let random_key = generate_random_biguint_in_range(&mut rng, &lower_bound, &upper_bound);
+                let thread_lower_bound: BigUint;
+                let thread_upper_bound: BigUint;
 
-                let mut private_key_hex = format!("{:x}", random_key);
-
-                if private_key_hex.len() % 2 != 0 {
-                    private_key_hex = format!("0{}", private_key_hex);
-                }
-
-                let private_key_bytes = hex::decode(&private_key_hex).expect("Invalid hex string");
-
-                let mut padded_private_key_bytes = [0u8; 32];
-                let start_index = 32 - private_key_bytes.len();
-                padded_private_key_bytes[start_index..].copy_from_slice(&private_key_bytes);
-
-                let private_key = SecretKey::from_slice(&padded_private_key_bytes).unwrap();
-                let generated_address = precompute_public_key(&private_key, &secp);
-
-                let mut new_key = false;
                 {
-                    let mut filter = bloom_filter.lock().unwrap();
-                    if !filter.contains(&private_key_hex) {
-                        filter.insert(&private_key_hex);
-                        new_key = true;
+                    // Gerar o próximo range de forma aleatória e verificar se já está em uso
+                    let mut rng = rng_mutex.lock().unwrap();
+                    loop {
+                        let range_start = rng.gen_biguint_range(&lower_bound, &upper_bound);
+                        let range_end = std::cmp::min(range_start.clone() + range_size.clone(), upper_bound.clone());
+
+                        let mut bloom = bloom_filter.lock().unwrap();
+
+                        // Verifica se o range já foi testado com o Bloom Filter
+                        if !bloom.contains(&range_start.to_bytes_be()) {
+                            // Se não foi testado, adicionar ao Bloom Filter
+                            bloom.insert(&range_start.to_bytes_be());
+
+                            thread_lower_bound = range_start;
+                            thread_upper_bound = range_end;
+                            break;
+                        }
                     }
                 }
 
-                if new_key {
-                    if generated_address == target_address {
+                println!("Thread {}: lower_bound = {}, upper_bound = {}", i, thread_lower_bound, thread_upper_bound);
+
+                let mut current_key = thread_lower_bound.clone();
+
+                while current_key <= thread_upper_bound && !found.load(Ordering::Relaxed) {
+                    let private_key_hex = format!("{:x}", current_key);
+                    let private_key_hex = if private_key_hex.len() % 2 != 0 {
+                        format!("0{}", private_key_hex)
+                    } else {
+                        private_key_hex
+                    };
+                    let private_key_bytes = hex::decode(&private_key_hex).expect("Invalid hex string");
+
+                    let mut padded_private_key_bytes = [0u8; 32];
+                    let start_index = 32 - private_key_bytes.len();
+                    padded_private_key_bytes[start_index..].copy_from_slice(&private_key_bytes);
+
+                    let private_key = SecretKey::from_slice(&padded_private_key_bytes).unwrap();
+
+                    // Gerar o RIPEMD-160 diretamente da chave privada
+                    let ripemd160_hash = compute_ripemd160_from_private_key(&private_key, &secp);
+
+                    // Verificar se o hash RIPEMD-160 gerado corresponde ao alvo
+                    if ripemd160_hash == ripemd160::Hash::from_inner(target_ripemd160.into_inner()) {
                         found.store(true, Ordering::SeqCst);
                         if !print_once.swap(true, Ordering::SeqCst) {
                             let elapsed = start_time.elapsed();
                             let elapsed_duration = Duration::from_std(elapsed).unwrap();
                             let formatted_time = format_duration(elapsed_duration);
-                            println!("Found matching private key: {}\nTime to find the key: {}", private_key_hex, formatted_time);
+                            println!("Chave privada correspondente encontrada: {}\nTempo para encontrar a chave: {}", private_key_hex, formatted_time);
                         }
                         let _file_lock = file_mutex.lock().unwrap();
                         append_to_file(wallet_number, &wallet.address, &private_key_hex).expect("Unable to write to file");
@@ -209,15 +234,17 @@ async fn main() {
                     if total % REPORT_INTERVAL == 0 {
                         let elapsed_time = start_time.elapsed().as_secs_f64();
                         let keys_per_second = total as f64 / elapsed_time;
-                        println!("Keys checked: {}, Keys per second: {:.0}, Last key checked: {}, Last generated address: {}, Target Address: {}", total, keys_per_second, private_key_hex, generated_address, target_address);
+                        println!("Chaves verificadas: {}, Chaves por segundo: {:.0}, Última chave verificada: {}, RIPEMD-160 gerado: {}, RIPEMD-160 alvo: {}", total, keys_per_second, private_key_hex, ripemd160_hash, target_ripemd160);
                     }
-                }
 
-                let insertion_count = insertions.fetch_add(1, Ordering::Relaxed) + 1;
-                if insertion_count >= MAX_INSERTIONS_BEFORE_RESET {
-                    let mut filter = bloom_filter.lock().unwrap();
-                    *filter = BloomFilter::with_size(BLOOM_FILTER_SIZE, BLOOM_FILTER_HASHES);
-                    insertions.store(0, Ordering::Relaxed);
+                    current_key += 1u8; // Incremento para chave sequencial
+
+                    let insertion_count = insertions.fetch_add(1, Ordering::Relaxed) + 1;
+                    if insertion_count >= MAX_INSERTIONS_BEFORE_RESET {
+                        let mut filter = bloom_filter.lock().unwrap();
+                        *filter = BloomFilter::with_size(BLOOM_FILTER_SIZE, BLOOM_FILTER_HASHES);
+                        insertions.store(0, Ordering::Relaxed);
+                    }
                 }
             }
         });

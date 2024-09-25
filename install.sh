@@ -15,7 +15,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/hunt   
-ExecStart=/opt/hunt/target/release/btc_key_checker --carteira=77                                   
+ExecStart=/opt/hunt/target/release/btc_key_checker --carteira=68                                   
 StandardOutput=append:/opt/hunt/log-service-output.log
 StandardError=append:/opt/hunt/log-service-err.log
 

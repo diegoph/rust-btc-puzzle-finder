@@ -83,6 +83,30 @@
             "lowerbound": "100000000000000000000000000000000",
             "upperbound": "1ffffffffffffffffffffffffffffffff",
             "address": "1Hz3uv3nNZzBVMXLGadCucgjiCs5W9vaGz"
+        },
+        {
+            "numero": 81,
+            "lowerbound": "100000000000000000000",
+            "upperbound": "1ffffffffffffffffffff",
+            "address": "15qsCm78whspNQFydGJQk5rexzxTQopnHZ"
+        },
+        {
+            "numero": 113,
+            "lowerbound": "10000000000000000000000000000",
+            "upperbound": "1ffffffffffffffffffffffffffff",
+            "address": "1NeGn21dUDDeqFQ63xb2SpgUuXuBLA4WT4"
+        },
+        {
+            "numero": 77,
+            "lowerbound": "10000000000000000000",
+            "upperbound": "1fffffffffffffffffff",
+            "address": "1Bxk4CQdqL9p22JEtDfdXMsng1XacifUtE"
+        },
+        {
+            "numero": 68,
+            "lowerbound": "80000000000000000",
+            "upperbound": "fffffffffffffffff",
+            "address": "1MVDYgVaSN6iKKEsbzRUAYFrYJadLYZvvZ"
         }
     ]
 }
