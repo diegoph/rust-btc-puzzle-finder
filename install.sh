@@ -1,5 +1,8 @@
 #!/bin/bash
+
 sudo apt-get install -y build-essential
+curl https://sh.rustup.rs -sSf | sh -s -- -y
+
 #make
 #NUM_THREADS=$(($(nproc) - 1))
 
