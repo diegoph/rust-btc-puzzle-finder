@@ -1,5 +1,5 @@
 #!/bin/bash
-#sudo apt-get install -y libcurl4-openssl-dev build-essential libssl-dev libgmp-dev
+sudo apt-get install -y build-essential
 #make
 #NUM_THREADS=$(($(nproc) - 1))
 
